@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pedidos Olla</title>
+  <!-- Librería para exportar a Excel -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #81d1f6;
+    }
+    .container {
+      max-width: 800px;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      margin: auto;
+    }
+    .form-group {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .form-group label {
+      width: 150px;
+      font-weight: bold;
+    }
+    .form-group input,
+    .form-group select {
+      flex: 1;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    .autocomplete-container {
+      position: relative;
+    }
+    .autocomplete-suggestions {
+      position: absolute;
+      border: 1px solid #ccc;
+      max-height: 200px;
+      overflow-y: auto;
+      background: white;
+      width: 100%;
+      z-index: 1000;
+      border-radius: 4px;
+      box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+      display: none;
+    }
+    .autocomplete-suggestion {
+      padding: 10px;
+      cursor: pointer;
+      border-bottom: 1px solid #eee;
+    }
+    .autocomplete-suggestion:last-child {
+      border-bottom: none;
+    }
+    .autocomplete-suggestion:hover {
+      background-color: #f4f4f4;
+    }
+    .buttons {
+      text-align: center;
+      margin-top: 20px;
+    }
+    .buttons button {
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      background: #28a745;
+      color: white;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .buttons button:hover {
+      background: #218838;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #4CAF50;
+      color: white;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>Pedidos  La Olla</h2>
+
+    <!-- Fecha -->
+    <div class="form-group">
+      <label for="fecha">Fecha:</label>
+      <input type="date" id="fecha" />
+    </div>
+
+    <!-- Encargado -->
+    <div class="form-group">
+      <label for="encargado">Encargado:</label>
+      <input type="text" id="encargado" placeholder="Nombre del encargado" />
+    </div>
+
+    <!-- Área -->
+    <div class="form-group">
+      <label for="area">Área:</label>
+      <select id="area">
+        <option value="Cuarto Caliente">Cuarto Caliente</option>
+        <option value="Cuarto Frío">Cuarto Frío</option>
+        <option value="Pastelería">Pastelería</option>
+        <option value="Steward">Steward</option>
+        <option value="Barra">Barra</option>
+        <option value="Administración">Administración</option>
+        <option value="Parrilla">Parrilla</option>
+      </select>
+    </div>
+
+    <hr/>
+
+    <!-- WhatsApp -->
+    <div class="form-group">
+      <label for="whatsapp">WhatsApp:</label>
+      <input type="text" id="whatsapp" placeholder="Ej: +56912345678" />
+    </div>
+
+    <!-- Buscador dinámico -->
+    <div class="form-group autocomplete-container">
+      <label for="search">Buscar producto:</label>
+      <input
+        type="text"
+        id="search"
+        placeholder="Ingrese nombre o código"
+        onkeyup="mostrarSugerencias()"
+        onclick="mostrarSugerencias()"
+      />
+      <div id="sugerencias" class="autocomplete-suggestions"></div>
+    </div>
+
+    <!-- Cantidad -->
+    <div class="form-group">
+      <label for="cantidad">Cantidad:</label>
+      <input type="number" id="cantidad" min="1" value="1" />
+    </div>
+
+    <!-- Botón Agregar -->
+    <div class="buttons">
+      <button onclick="agregarProducto()">Agregar Producto</button>
+    </div>
+
+    <!-- Tabla de productos -->
+    <h3>Productos en el Pedido</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Nombre</th>
+          <th>Cantidad</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody id="pedido"></tbody>
+    </table>
+
+    <!-- Botón Exportar/Enviar WhatsApp -->
+    <div class="buttons">
+      <button onclick="exportarYEnviarWhatsApp()">Generar Excel y Enviar</button>
+    </div>
+  </div>
+
+  <script>
+    // Lista de productos de prueba
+    const productosLista = [
+    { codigo: "ABA100001", nombre: "ACEITE MAXIFRITS bdn 10 L" },
+{ codigo: "ABA100002", nombre: "ACEITE OLIVA 5L" },
+{ codigo: "ABA100003", nombre: "ACEITE VEGETAL 5L" },
+{ codigo: "ABA100004", nombre: "ACEITUNAS NEGRAS" },
+{ codigo: "ABA100005", nombre: "ACEITUNAS VERDES" },
+{ codigo: "ABA100006", nombre: "ACETO BALSAMICO" },
+{ codigo: "ABA100007", nombre: "AJI DE COLOR 1K" },
+{ codigo: "ABA100008", nombre: "ALBUMINA" },
+{ codigo: "ABA100009", nombre: "ALCAPARRAS" },
+{ codigo: "ABA100010", nombre: "ALMENDRAS LAMINADAS 1K" },
+{ codigo: "ABA100011", nombre: "ARROZ 1K" },
+{ codigo: "ABA100012", nombre: "ARVEJAS PARTIDAS" },
+{ codigo: "ABA100013", nombre: "AZUCAR FLOR" },
+{ codigo: "ABA100014", nombre: "AZUCAR SACHET" },
+{ codigo: "ABA100015", nombre: "AZUCAR 1K" },
+{ codigo: "ABA100016", nombre: "AZUCAR IANSA 5K" },
+{ codigo: "ABA100017", nombre: "BBQ SAUCE ORIGINAL 510G" },
+{ codigo: "ABA100018", nombre: "BEBIDA COCO" },
+{ codigo: "ABA100019", nombre: "BIDON AGUA MINERAL BENEDICTINO 6L" },
+{ codigo: "ABA100020", nombre: "CACAO AMARGO 1Kg" },
+{ codigo: "ABA100021", nombre: "CACAO AMARGO GURMET 150G" },
+{ codigo: "ABA100022", nombre: "CACAO AMARGO LIDER 150G" },
+{ codigo: "ABA100023", nombre: "CAJA KETCHUP SACHET" },
+{ codigo: "ABA100024", nombre: "CAJA MOSTAZA SACHET" },
+{ codigo: "ABA100025", nombre: "CALDO DE GALLINA MAGGI 850G" },
+{ codigo: "ABA100026", nombre: "CASTAÑAS EN ALMIBAR GARCIA 1K" },
+{ codigo: "ABA100027", nombre: "MARRASQUINO ROJO" },
+{ codigo: "ABA100028", nombre: "CHOCOLATE EN POLVO DULCE 1Kg" },
+{ codigo: "ABA100029", nombre: "CHOCOLATE EN POLVO DULCE 2Kg" },
+{ codigo: "ABA100030", nombre: "COBERTURA NEUCOBER" },
+{ codigo: "ABA100031", nombre: "COCO RALLADO GURMET" },
+{ codigo: "ABA100032", nombre: "COMINO MOLIDO" },
+{ codigo: "ABA100033", nombre: "CREMA COLUN 1L" },
+{ codigo: "ABA100034", nombre: "CREMA DE COCO" },
+{ codigo: "ABA100035", nombre: "CREMA GURMET PASTELERA" },
+{ codigo: "ABA100036", nombre: "ENELDO DESHIDRATADO" },
+{ codigo: "ABA100037", nombre: "ESENCIA DE VAINILLA 1L" },
+{ codigo: "ABA100038", nombre: "ESENCIA DE VAINILLA EDRA 155ML" },
+{ codigo: "ABA100039", nombre: "FONDOS DE ALCACHOFA" },
+{ codigo: "ABA100040", nombre: "FRUTILLAS WASIL 410G" },
+{ codigo: "ABA100041", nombre: "FRUTOS SECOS Y CEREALES" },
+{ codigo: "ABA100042", nombre: "GALLETAS DE CHAMPAGNE VICENZ 200G" },
+{ codigo: "ABA100043", nombre: "GALLETAS DE CHAMPAGNE VICENZ 400G" },
+{ codigo: "ABA100044", nombre: "GARBANZOS" },
+{ codigo: "ABA100045", nombre: "HARINA  25 Kg PAPE" },
+{ codigo: "ABA100046", nombre: "HARINA ESPECIAL 20K" },
+{ codigo: "ABA100047", nombre: "HAUSBRAND CAJA" },
+{ codigo: "ABA100048", nombre: "HAUSBRAND DESCAFEINADO" },
+{ codigo: "ABA100049", nombre: "HIGOS RELLENOS" },
+{ codigo: "ABA100050", nombre: "JUGO DE TOMATES FRESCOS 300CC" },
+{ codigo: "ABA100051", nombre: "JUREL PACIFIC 320" },
+{ codigo: "ABA100052", nombre: "KETCHUP" },
+{ codigo: "ABA100053", nombre: "LASAÑA CAROZZI" },
+{ codigo: "ABA100054", nombre: "LAUREL HOJA SECA" },
+{ codigo: "ABA100055", nombre: "LECHE CONDENSADA NESTLE TARRO 48x397g CL" },
+{ codigo: "ABA100056", nombre: "LECHE ENTERA COLUN 1L" },
+{ codigo: "ABA100057", nombre: "LECHE EVAPORADA" },
+{ codigo: "ABA100058", nombre: "LECHE SIN LACTOZA COLUN 1L" },
+{ codigo: "ABA100059", nombre: "LENTEJAS BANQUETE 1K" },
+{ codigo: "ABA100060", nombre: "LEVADURA BAKERDREAM 500G" },
+{ codigo: "ABA100061", nombre: "MAICENA 1 Kg" },
+{ codigo: "ABA100062", nombre: "MAICENA 25KG" },
+{ codigo: "ABA100063", nombre: "MANJAR COLUN 1K" },
+{ codigo: "ABA100064", nombre: "MANTEQUILLA COLUN 250g" },
+{ codigo: "ABA100065", nombre: "MAYO KRAFT POTE" },
+{ codigo: "ABA100066", nombre: "MAYO SACHET KRAFT 500g" },
+{ codigo: "ABA100067", nombre: "MAYONESA HELLMANNS 1.94" },
+{ codigo: "ABA100068", nombre: "MERMELADA FRAMB" },
+{ codigo: "ABA100069", nombre: "MIX DE PIMIENTAS GURMET 43G" },
+{ codigo: "ABA100070", nombre: "MONDADIENTES" },
+{ codigo: "ABA100071", nombre: "MOSTAZA" },
+{ codigo: "ABA100072", nombre: "NESCAFE SACHET CAJA" },
+{ codigo: "ABA100073", nombre: "NESCAFE TRADICION 400G" },
+{ codigo: "ABA100074", nombre: "NUEZ MARIPOSA 1K" },
+{ codigo: "ABA100075", nombre: "NUEZ MOSCADA MOLIDA 5G GURMET" },
+{ codigo: "ABA100076", nombre: "NUEZ MOSCADA MOLIODA 1K" },
+{ codigo: "ABA100077", nombre: "OREGANO DESHIDRATADO 1K" },
+{ codigo: "ABA100078", nombre: "PAELLERO 20G" },
+{ codigo: "ABA100079", nombre: "PALMITO ENTERO 400G" },
+{ codigo: "ABA100080", nombre: "PALMITO ENTERO 800 gr" },
+{ codigo: "ABA100081", nombre: "PAPAYAS Al JUGO 1K" },
+{ codigo: "ABA100082", nombre: "PASTA ESPIRALES" },
+{ codigo: "ABA100083", nombre: "PEPAS DE ZAPALLO 1K" },
+{ codigo: "ABA100084", nombre: "PEPINILLOS GURKENTOPF 1550G" },
+{ codigo: "ABA100085", nombre: "PICKLE SURTIDO TRAVERSO 1Kg" },
+{ codigo: "ABA100086", nombre: "PIMIENTA NEGRA ENTERA 1K" },
+{ codigo: "ABA100087", nombre: "PIÑA EN RODAJAS LATA 850 gr" },
+{ codigo: "ABA100088", nombre: "PIÑAS EN RODAJAS BONAFOOD 490" },
+{ codigo: "ABA100089", nombre: "POLVO DE HORNEAR IMPERIAL 100G" },
+{ codigo: "ABA100090", nombre: "POLVO DE HORNEAR" },
+{ codigo: "ABA100091", nombre: "POROTOS IANSA 1K" },
+{ codigo: "ABA100092", nombre: "QUESO CREMA" },
+{ codigo: "ABA100093", nombre: "QUESO MOZZARELLA PORCION" },
+{ codigo: "ABA100094", nombre: "QUESO PARMESANO PORCION" },
+{ codigo: "ABA100095", nombre: "QUESO COLUN RANCO 10K" },
+{ codigo: "ABA100096", nombre: "QUESO COLUN RANCO 2K" },
+{ codigo: "ABA100097", nombre: "QUESO REGGIANITO COLUN  8366G" },
+{ codigo: "ABA100098", nombre: "QUESO REGGIANITO RALLADO 2K COLUN" },
+{ codigo: "ABA100099", nombre: "SAL DE MAR LOBOS EXTRA GRUESA 88G" },
+{ codigo: "ABA100100", nombre: "SAL FINA" },
+{ codigo: "ABA100101", nombre: "SAL parrillera" },
+{ codigo: "ABA100102", nombre: "SALSA DE SOYA ACUENTA 1L" },
+{ codigo: "ABA100103", nombre: "SALSA DE TOMATES CAROZZI POMAROLA" },
+{ codigo: "ABA100104", nombre: "SALSA ESPAÑOLA MAGGI 1K" },
+{ codigo: "ABA100105", nombre: "SALSA INGLESA GURMET 165cc" },
+{ codigo: "ABA100106", nombre: "SAZONADOR PAELLA CARMENCITA 295G" },
+{ codigo: "ABA100107", nombre: "SEMILLAS DE AMAPOLA 1K" },
+{ codigo: "ABA100108", nombre: "SEMILLAS DE CHIA 1K" },
+{ codigo: "ABA100109", nombre: "SEMILLAS DE MARAVILLA 1K" },
+{ codigo: "ABA100110", nombre: "SEMILLAS Y CEREALES" },
+{ codigo: "ABA100111", nombre: "SESAMO BLANCO 1K" },
+{ codigo: "ABA100112", nombre: "SESAMO MIX 1K" },
+{ codigo: "ABA100113", nombre: "SESAMO NEGRO 1K" },
+{ codigo: "ABA100114", nombre: "SPAGUETTY 3 VEGETALES LUCHETTY" },
+{ codigo: "ABA100115", nombre: "SPAGUETTY N°5 CAROZZI" },
+{ codigo: "ABA100116", nombre: "ACETO BALSAMICO 5L" },
+{ codigo: "ABA100117", nombre: "STEVIA IANSA 350 ML" },
+{ codigo: "ABA100118", nombre: "STEVIA SACHET CAJA" },
+{ codigo: "ABA100119", nombre: "TABASCO 60ML" },
+{ codigo: "ABA100120", nombre: "TABASCO MIX BLOODY MARY 946cc" },
+{ codigo: "ABA100121", nombre: "TE AHMAD CAMOMILLE LEMONGRASS" },
+{ codigo: "ABA100122", nombre: "TE AHMAD CHAI SPICE" },
+{ codigo: "ABA100123", nombre: "TE AHMAD LIMA LIMON" },
+{ codigo: "ABA100124", nombre: "TE AHMAD MANGO MAGIC" },
+{ codigo: "ABA100125", nombre: "TE AHMAD PEACH AND PASSION FRUIT" },
+{ codigo: "ABA100126", nombre: "TE AHMAD STRAWBERRY" },
+{ codigo: "ABA100127", nombre: "TE AHMAD TEA APPLE REFRESH 20G" },
+{ codigo: "ABA100128", nombre: "TE AHMAD TEA DARJEELING 20G" },
+{ codigo: "ABA100129", nombre: "TE AHMAD TEA EARL GREY 200G" },
+{ codigo: "ABA100130", nombre: "TE AHMAD TEA ENGLISH BREAKFAST 200G" },
+{ codigo: "ABA100131", nombre: "TE AHMAD TEA ENGLISH N°1 200G" },
+{ codigo: "ABA100132", nombre: "TE AHMAD TEA EVENING TEA 20G" },
+{ codigo: "ABA100133", nombre: "TE AHMAD TEA FRUIT SELECTION" },
+{ codigo: "ABA100134", nombre: "TE AHMAD TEA GREEN TEA PURE 200G" },
+{ codigo: "ABA100135", nombre: "TE AHMAD TEA MINT MISTIQUE 20G" },
+{ codigo: "ABA100136", nombre: "TE AHMAD TEA MIX BERRIES 20G" },
+{ codigo: "ABA100137", nombre: "TE AHMAD TEA RASPBERRY 20G" },
+{ codigo: "ABA100138", nombre: "TE AHMAD TEA ROIBOS CANELA" },
+{ codigo: "ABA100139", nombre: "TE AHMAD TEA VAINILLA TRANQUILLITY 20G" },
+{ codigo: "ABA100140", nombre: "TE DAMMAN TISANE CAMOMILLE 21G" },
+{ codigo: "ABA100141", nombre: "TE LIPTON EXTRA INTENCE 220G" },
+{ codigo: "ABA100142", nombre: "TE LIPTON ROYAL CEYLON 180G" },
+{ codigo: "ABA100143", nombre: "TE LIPTON YELLOW LABEL 200G" },
+{ codigo: "ABA100144", nombre: "TE SUPREMO 8 HIERBAS 20G" },
+{ codigo: "ABA100145", nombre: "TE SUPREMO MENTA 20G" },
+{ codigo: "ABA100146", nombre: "TOMILLO EN HOJAS 7G" },
+{ codigo: "ABA100147", nombre: "TORTILLA BURRITO 22 CM" },
+{ codigo: "ABA100148", nombre: "VINAGRE VINO BLANCO TRAVERSO 1L" },
+{ codigo: "ABA100149", nombre: "VINAGRE VINO TINTO TRAVERSO 1L" },
+{ codigo: "ABA100150", nombre: "CALDO DE CARNE MAGGI 850G" },
+{ codigo: "ABA100151", nombre: "HARINA INT Trigo 25k" },
+{ codigo: "ABA100152", nombre: "CREMA Chantilli" },
+{ codigo: "ABA100153", nombre: "AJI EN PASTA BIDON" },
+{ codigo: "ABA100154", nombre: "CHUCRUT" },
+{ codigo: "ABA100155", nombre: "PIMIENTA NEGRA MOLIDA KILO" },
+{ codigo: "ABA100156", nombre: "VINAGRE VINO BLANCO 5L" },
+{ codigo: "ABA100157", nombre: "MARRASQUINO ROJO" },
+{ codigo: "ABA100158", nombre: "MANGO KILO" },
+{ codigo: "ABA100159", nombre: "CANELA ENTERA 500G" },
+{ codigo: "ABA100160", nombre: "VINAGRE VINO TINTO 5L" },
+{ codigo: "AI1100161", nombre: "AGENTE DE LIMPIEZA CIF BAÑO 450ML" },
+{ codigo: "AI1100162", nombre: "ALCOHOL 70% 5L" },
+{ codigo: "AI1100163", nombre: "ALCOHOL 70% DERMOGENOL" },
+{ codigo: "AI1100164", nombre: "ALCOHOL GEL 5L" },
+{ codigo: "AI1100165", nombre: "BOLSA DE BASURA NEGRA 10/U" },
+{ codigo: "AI1100166", nombre: "BOLSA KRAFT CON MANGO" },
+{ codigo: "AI1100167", nombre: "BOLSA PORCIONADORA 20X30" },
+{ codigo: "AI1100168", nombre: "BOLSA PORCIONADORA 50X70" },
+{ codigo: "AI1100169", nombre: "BOLSA vacio 22x30x90" },
+{ codigo: "AI1100170", nombre: "BOMBILLA PAPEL NEGRO" },
+{ codigo: "AI1100171", nombre: "BROCHETA PALETA 25CM 12U" },
+{ codigo: "AI1100172", nombre: "contenedor C10" },
+{ codigo: "AI1100173", nombre: "contenedor C20" },
+{ codigo: "AI1100174", nombre: "contenedor C30" },
+{ codigo: "AI1100175", nombre: "CEPILLO DE DIENTES ORAL/B" },
+{ codigo: "AI1100176", nombre: "CIF CREMA" },
+{ codigo: "AI1100177", nombre: "CLORO DILUIDO" },
+{ codigo: "AI1100178", nombre: "CLORO concentrado" },
+{ codigo: "AI1100179", nombre: "CONFORT PERSONAL" },
+{ codigo: "AI1100180", nombre: "DESENGRASANTE KLAPP 5L" },
+{ codigo: "A-I100181", nombre: "DETERGENTE LAVAVAJILLAS 20LTD AQUAGEN PLUS 45 SUCITESA" },
+{ codigo: "AI1100182", nombre: "ESCOBILLON ECO" },
+{ codigo: "AI1100183", nombre: "ESPONJA MULTIUSO SCOTCH BRITE PACK 3/U" },
+{ codigo: "AI1100184", nombre: "SERVILLETA FIT TORK" },
+{ codigo: "AI1100185", nombre: "GAS 190G" },
+{ codigo: "AI1100186", nombre: "GAS RONSON 50ML" },
+{ codigo: "AI1100187", nombre: "DESODORANTE AMBIENTAL 309G" },
+{ codigo: "AI1100188", nombre: "GORRO CLIP TRESOR 100/U" },
+{ codigo: "AI1100189", nombre: "GUANTE COCINA" },
+{ codigo: "AI1100190", nombre: "GUANTES VINILO (S)" },
+{ codigo: "AI1100191", nombre: "HIGENICO SMART ONE 6x207" },
+{ codigo: "AI1100192", nombre: "JABON ESPUMA TORK" },
+{ codigo: "AI1100193", nombre: "JABON LIQUIDO ELITE 700ML" },
+{ codigo: "AI1100194", nombre: "JABON POPEYE 2/U" },
+{ codigo: "AI1100195", nombre: "JABON PROTEX 500ML" },
+{ codigo: "AI1100196", nombre: "LAVALOZAS KLAPP 5L" },
+{ codigo: "AI1100197", nombre: "LIMPIA PISO consentrado" },
+{ codigo: "AI1100198", nombre: "LIMPIA VIDRIOS 5L" },
+{ codigo: "AI1100199", nombre: "LUSTRA MUEBLES VIRGINIA 250G" },
+{ codigo: "AI1100200", nombre: "LUSTRA MUEBLES VIRGINIA 360G" },
+{ codigo: "AI1100201", nombre: "LUSTRA MUEBLES VIRGINIA 500G" },
+{ codigo: "AI1100202", nombre: "MANLAC PLATA 3/U" },
+{ codigo: "AI1100203", nombre: "MISTER MUSCULO CREMOSO 450G" },
+{ codigo: "AI1100204", nombre: "MISTER MUSCULO LIMPIA VIDRIOS 450ML" },
+{ codigo: "AI1100205", nombre: "MISTER MUSCULO LIMPIA VIDRIOS 500ML" },
+{ codigo: "AI1100206", nombre: "NOVA 24M" },
+{ codigo: "AI1100207", nombre: "NOVA 250M" },
+{ codigo: "AI1100208", nombre: "PALA BASURA" },
+{ codigo: "AI1100209", nombre: "PAÑO AMARILLO MICROFIBRA" },
+{ codigo: "AI1100210", nombre: "PAÑUELOS DESECHABLES ELITE 50/U" },
+{ codigo: "AI1100211", nombre: "PAPEL ALUMINIO" },
+{ codigo: "AI1100212", nombre: "POET DILUIDO" },
+{ codigo: "AI1100213", nombre: "RAID MATA MOSCAS S/OLOR" },
+{ codigo: "AI1100214", nombre: "ROLLO FILM PVC 38 CM (1X1400M)" },
+{ codigo: "AI1100215", nombre: "ROLLO PAPEL KRAFT" },
+{ codigo: "AI1100216", nombre: "ROLLO PREPICADO 50x70 (4,8K APROX.)" },
+{ codigo: "AI1100217", nombre: "ROLLOS DE ACERO VIRUTILLA FINA 12/U" },
+{ codigo: "AI1100218", nombre: "SACO CAFE T-400  1x500 (DPS)" },
+{ codigo: "AI1100219", nombre: "SERVILLETA 38x38 AZUL" },
+{ codigo: "AI1100220", nombre: "SERVILLETA COCTEL" },
+{ codigo: "AI1100221", nombre: "TRAPERO WINKLER VERDE" },
+{ codigo: "AI1100222", nombre: "BOLSA vacio 25x35x80" },
+{ codigo: "AI1100223", nombre: "FOSFOROS" },
+{ codigo: "BB1100224", nombre: "AGUA TONICA 6PFx4 LAT 350cc" },
+{ codigo: "BB1100225", nombre: "COCA COLA  x6 LATA 350cc" },
+{ codigo: "BB1100226", nombre: "COCA COLA LIGTH  x6 LATA 350cc" },
+{ codigo: "BB1100227", nombre: "COCA COLA SIN AZUCAR  x6 LATA 350cc" },
+{ codigo: "BB1100228", nombre: "CRUSH 6PFX4 LAT350" },
+{ codigo: "BB1100229", nombre: "FANTA x6 LATA 350cc" },
+{ codigo: "BB1100230", nombre: "frambuesas" },
+{ codigo: "BB1100231", nombre: "FRUTA CONGELADA FRUTILLA X 10 1 KG" },
+{ codigo: "BB1100232", nombre: "FRUTA CONGELADA LIMON X 10 1 KG" },
+{ codigo: "BB1100233", nombre: "FRUTA CONGELADA MANGO X 10 1 KG" },
+{ codigo: "BB1100234", nombre: "FRUTA CONGELADA MARACUYA X 10 1 KG" },
+{ codigo: "BB1100235", nombre: "FRUTA CONGELADA PIÑA X 10 1 KG" },
+{ codigo: "BB1100236", nombre: "FRUTILLA PULPA GUALLARAUCO 1K" },
+{ codigo: "BB1100237", nombre: "GINGER ALE 6PFx4 LAT 350cc" },
+{ codigo: "BB1100238", nombre: "GINGER ALE ZERO 6PFx4 LAT 350cc" },
+{ codigo: "BB1100239", nombre: "JUGO LIMON SUTIL kilo" },
+{ codigo: "BB1100240", nombre: "KEM PIÑA" },
+{ codigo: "BB1100241", nombre: "LIMON SODA 350cc" },
+{ codigo: "BB1100242", nombre: "MANGO PULPA MINUTO VERDE 1K" },
+{ codigo: "BB1100243", nombre: "MARACUYA PULPA GUALLARAUCO 1K" },
+{ codigo: "BB1100244", nombre: "PEPSI 6PFx4 LAT 350cc" },
+{ codigo: "BB1100245", nombre: "PEPSI ZERO 6PFx4 LAT 350cc" },
+{ codigo: "BB1100246", nombre: "WATTS PIÑA X6" },
+{ codigo: "BB1100247", nombre: "SPRITE  x6 LATA 350cc" },
+{ codigo: "BB1100248", nombre: "SPRITE ZERO  x6 LATA 350cc" },
+{ codigo: "BB1100250", nombre: "VITAL SIN GAS x12 VNR 330 cc" },
+{ codigo: "BB1100249", nombre: "VITAL CON GAS x12 VNR 330cc" },
+{ codigo: "BB1100251", nombre: "WATTS NAR X6" },
+{ codigo: "BB1100252", nombre: "WATTS DUR X6" },
+{ codigo: "BB1100253", nombre: "GINGER ALE LIGHT 6PFx4 LAT 350cc" },
+{ codigo: "BB1100254", nombre: "PULPA DE MANGO" },
+{ codigo: "CNG100255", nombre: "ASADO BRAUNAU CERDO LOMO VETADO" },
+{ codigo: "CNG100256", nombre: "ATUN LOMO IMP 2-UPKG" },
+{ codigo: "CNG100257", nombre: "BOLSA CHOLGAS 1K" },
+{ codigo: "CNG100258", nombre: "CAJA DE CHORITOS 12K" },
+{ codigo: "CNG100259", nombre: "CAMARON CRUDO CON PIEL U/15" },
+{ codigo: "CNG100260", nombre: "CARNE MOLIDA PERSONAL" },
+{ codigo: "CNG100261", nombre: "CARNE MOLIDA VACUNO" },
+{ codigo: "CNG100262", nombre: "CAZUELA FRESCA CERDO" },
+{ codigo: "CNG100263", nombre: "CERDO AHUMADO PULPA BOLSA" },
+{ codigo: "CNG100264", nombre: "CERDO PERSONAL" },
+{ codigo: "CNG100265", nombre: "CHORITOS MALLA" },
+{ codigo: "CNG100266", nombre: "CHOROS MALTON MALLA" },
+{ codigo: "CNG100267", nombre: "CORVINA KL" },
+{ codigo: "CNG100268", nombre: "FILETE GRANEL" },
+{ codigo: "CNG100269", nombre: "FILETE NACIONAL" },
+{ codigo: "CNG100270", nombre: "GONGRIO DORADO" },
+{ codigo: "CNG100271", nombre: "GUATA 1° CONGELADA CAJA GRANDE" },
+{ codigo: "CNG100272", nombre: "HELADO FRUTILLA" },
+{ codigo: "CNG100273", nombre: "HELADO PIÑA" },
+{ codigo: "CNG100274", nombre: "HELADO VAINILLA" },
+{ codigo: "CNG100275", nombre: "HIELO CUBO K" },
+{ codigo: "CNG100276", nombre: "HIELO FRAPE K" },
+{ codigo: "CNG100277", nombre: "HUESO COGOTE ENTERO GRANDE" },
+{ codigo: "CNG100278", nombre: "HUESO PELADO VACUNO" },
+{ codigo: "CNG100279", nombre: "HUESP CARNUDO ENTERO GRANDE" },
+{ codigo: "CNG100280", nombre: "JUGO PLATEADA" },
+{ codigo: "CNG100281", nombre: "LANGOSTINO ENTERO 16/20 10U" },
+{ codigo: "CNG100282", nombre: "LOCOS 1K" },
+{ codigo: "CNG100283", nombre: "LOMO LISO KILO" },
+{ codigo: "CNG100284", nombre: "LOMO VETADO V+ GRANDE NACIONAL" },
+{ codigo: "CNG100285", nombre: "MACHAS FRESCAS KILO" },
+{ codigo: "CNG100286", nombre: "MARISCOS SURTIDOS" },
+{ codigo: "CNG100287", nombre: "MERLUZA AUSTRAL" },
+{ codigo: "CNG100288", nombre: "MERLUZA DEL SUR MERLUCCIUS AUSTRALIS" },
+{ codigo: "CNG100289", nombre: "OSOBUCO DE PIERNA" },
+{ codigo: "CNG100290", nombre: "OSTRA CHILENA CORRIENTE" },
+{ codigo: "CNG100291", nombre: "OSTRA CHILENA MEDIANA" },
+{ codigo: "CNG100292", nombre: "OSTRA CHILENA VICTORIA" },
+{ codigo: "CNG100293", nombre: "PATAS CERDO" },
+{ codigo: "CNG100294", nombre: "PAVO PERSONAL" },
+{ codigo: "CNG100309", nombre: "TRUTO DE POLLO GRANEL" },
+{ codigo: "CNG100296", nombre: "PICOROCO Fresco" },
+{ codigo: "CNG100297", nombre: "PINO LOCOS" },
+{ codigo: "CNG100298", nombre: "PLATEADA NACIONAL" },
+{ codigo: "CNG100299", nombre: "PRIETAS A/V X6U" },
+{ codigo: "CNG100300", nombre: "PULPO CRUDO K" },
+{ codigo: "CNG100301", nombre: "SALCHICHAS 1K LLANQUIHUE" },
+{ codigo: "CNG100302", nombre: "SALMON TRIM" },
+{ codigo: "CNG100303", nombre: "SOBRECOSTILLA" },
+{ codigo: "CNG100304", nombre: "TAPAPECHO" },
+{ codigo: "CNG100305", nombre: "TOCINO BRAUNAU BOLSA" },
+{ codigo: "CNG100306", nombre: "TOCINO PANCETA AHUMADO" },
+{ codigo: "CNG100307", nombre: "TRUCHA ARCOIRIS" },
+{ codigo: "CNG100308", nombre: "TRUTO CORTO DESDHUESADO DE PAVO" },
+{ codigo: "POR100586", nombre: "TRUTO DE POLLO 4U" },
+{ codigo: "CNG100310", nombre: "CHOCLILLO" },
+{ codigo: "CNG100311", nombre: "PULPA PIERNA" },
+{ codigo: "CNG100312", nombre: "CHULETA centro" },
+{ codigo: "CNG100313", nombre: "CARNE MOLIDA ESPECIAL" },
+{ codigo: "FV100314", nombre: "ACELGA" },
+{ codigo: "FV100315", nombre: "AJI VERDE MALLA X 1.5K" },
+{ codigo: "FV100316", nombre: "AJO CHILENO TIO CHICO" },
+{ codigo: "FV100317", nombre: "AJO CHILOTE" },
+{ codigo: "FV100318", nombre: "ALBAHACA PQTE" },
+{ codigo: "FV100319", nombre: "BERENJENAS uni" },
+{ codigo: "FV100320", nombre: "BETARRAGA BABY" },
+{ codigo: "FV100321", nombre: "CEBOLLA BLANCA EN MALLA" },
+{ codigo: "FV100322", nombre: "CEBOLLA MORADA EN MALLA" },
+{ codigo: "FV100323", nombre: "CEBOLLIN" },
+{ codigo: "FV100324", nombre: "CHAMPIGNON" },
+{ codigo: "FV100325", nombre: "CIBULET" },
+{ codigo: "FV100326", nombre: "CILANTRO PQTE" },
+{ codigo: "FV100327", nombre: "Flores Comestibles" },
+{ codigo: "FV100328", nombre: "DURAZNO" },
+{ codigo: "FV100329", nombre: "ESPINACA NATIVA" },
+{ codigo: "FV100330", nombre: "FRUTA Y VERDURA" },
+{ codigo: "FV100331", nombre: "HINOJO HIERBA" },
+{ codigo: "FV100332", nombre: "HUEVO EXTRA BLANCO/COLOR CAJA" },
+{ codigo: "FV100333", nombre: "JENGIBRE Kg" },
+{ codigo: "FV100334", nombre: "LECHUGAS" },
+{ codigo: "FV100335", nombre: "LIMON MEDIANO EN MALLA" },
+{ codigo: "FV100336", nombre: "LIMON MEDIANOPRIMERA" },
+{ codigo: "FV100337", nombre: "LIMON SUTIL GAMELA X  15K" },
+{ codigo: "FV100338", nombre: "LIMON SUTIL MALLA 15K" },
+{ codigo: "FV100339", nombre: "MENTA FRESCA Pq" },
+{ codigo: "FV100340", nombre: "MIX DE HOJAS" },
+{ codigo: "FV100341", nombre: "MORRON AMARILLO" },
+{ codigo: "FV100342", nombre: "MORRON VERDE" },
+{ codigo: "FV100343", nombre: "NARANJA  MALLA 15KG" },
+{ codigo: "FV100344", nombre: "NARANJA CAJON" },
+{ codigo: "FV100345", nombre: "PALTA HASS CHILENA" },
+{ codigo: "FV100346", nombre: "PALTA PROPAL MAYORISTA" },
+{ codigo: "FV100347", nombre: "PAPA CONSUMO ASTERIX" },
+{ codigo: "FV100348", nombre: "PAPAS NATIVAS" },
+{ codigo: "FV100349", nombre: "PAPAS SACO" },
+{ codigo: "FV100350", nombre: "PEPINO ENSALADA" },
+{ codigo: "FV100351", nombre: "PEPINO ENSALADA UNIDAD" },
+{ codigo: "FV100352", nombre: "PERAS" },
+{ codigo: "FV100353", nombre: "PEREJIL PAQUETE" },
+{ codigo: "FV100354", nombre: "PIMIENTON AMARILLO" },
+{ codigo: "FV100355", nombre: "PIÑA UNID" },
+{ codigo: "FV100356", nombre: "SACO DE PAPAS" },
+{ codigo: "FV100357", nombre: "TOMATE GAMELA CAT1" },
+{ codigo: "FV100358", nombre: "ZANAHORIA SACO" },
+{ codigo: "FV100359", nombre: "ZAPALLO CAMOTE X KG" },
+{ codigo: "FV100360", nombre: "ZAPALLO ITALIANO UNIDAD" },
+{ codigo: "FV100361", nombre: "MANZANA VERDE KILO" },
+{ codigo: "FV100362", nombre: "CEBOLLA PERLA ESCABECHE KILO" },
+{ codigo: "FV100363", nombre: "MORRON ROJO" },
+{ codigo: "FV100364", nombre: "AJI CACHO CABRA KILO" },
+{ codigo: "FV100365", nombre: "PAPA CHILOTA" },
+{ codigo: "FV100366", nombre: "MORRON" },
+{ codigo: "FV100367", nombre: "MANGO uni" },
+{ codigo: "IO100368", nombre: "ANOTADOR OFICIO VINILICO NEGRO" },
+{ codigo: "IO100369", nombre: "APRETADOR DOBLE CLIP 41MM 12U" },
+{ codigo: "IO100370", nombre: "ARCHIVADOR CARTA ANCHO BURDEO WILSON" },
+{ codigo: "IO100371", nombre: "BANDEJA PARA ESCRITORIO" },
+{ codigo: "IO100372", nombre: "CALCULADORA" },
+{ codigo: "IO100373", nombre: "CINTA ADHESIVA 18MM X30 MTS SELLOCINTA SELLOFFICE" },
+{ codigo: "IO100374", nombre: "CINTA ADHESIVA DE PAPEL ALLBRIEFS" },
+{ codigo: "IO100375", nombre: "CUCHILLO CARTONERO METALICO" },
+{ codigo: "IO100376", nombre: "LAPIZ PASTA CREISTAL AZUL BIC" },
+{ codigo: "IO100377", nombre: "LIBRO ASISTENCIA 100 HOJAS AUCA" },
+{ codigo: "IO100378", nombre: "OPALINA HILADA BLANCA 200 GRS 100HJS" },
+{ codigo: "IO100379", nombre: "PAPEL FOTOCOPIA CARTA RESMA 500 HJS" },
+{ codigo: "IO100380", nombre: "ROLLO TERMICO 80X80" },
+{ codigo: "IO100381", nombre: "ROLLO TERMICO 80X80 10 ROLLOS" },
+{ codigo: "IO100382", nombre: "TALONARIO APUNTES GARZON" },
+{ codigo: "IO100383", nombre: "TONER 1060" },
+{ codigo: "IO100384", nombre: "Articulos de oficina" },
+{ codigo: "MV100385", nombre: "93 S/P" },
+{ codigo: "MV100386", nombre: "95 S/P" },
+{ codigo: "MV100387", nombre: "AGUA GEN PLUS 45 20L" },
+{ codigo: "MV100388", nombre: "AGUA POTABLE" },
+{ codigo: "MV100389", nombre: "ALCOHOL DILUIDO" },
+{ codigo: "MV100390", nombre: "ARRIENDO" },
+{ codigo: "MV100391", nombre: "BALDE TRAPERO CON ESCURRIDOR" },
+{ codigo: "MV100392", nombre: "BANDEJA CONDENSACION" },
+{ codigo: "MV100393", nombre: "BEBIDA COCO" },
+{ codigo: "MV100394", nombre: "BUZO DESECHABLE C/GORRO MY SAFE XL" },
+{ codigo: "MV100395", nombre: "LUZ" },
+{ codigo: "MV100396", nombre: "CATALIZADOR MACROPOXI 646 COALTAR GL" },
+{ codigo: "MV100397", nombre: "CLORO IMPEKE 4L" },
+{ codigo: "MV100398", nombre: "Consumo Electrico" },
+{ codigo: "MV100399", nombre: "CREOLINA 1L" },
+{ codigo: "MV100400", nombre: "DETERGENTE OMO POLVO 3,6" },
+{ codigo: "MV100401", nombre: "DILUYENTE SINTETICO SO 111 1GL" },
+{ codigo: "MV100402", nombre: "DISEL" },
+{ codigo: "MV100403", nombre: "E.AGUA SAT .KP 2000 BASE" },
+{ codigo: "MV100404", nombre: "ESCOBILLON ECONO VIRUTEX PRO" },
+{ codigo: "MV100405", nombre: "ESPONJA ACERO INOXIDABLE VIRUTEX" },
+{ codigo: "MV100406", nombre: "FIERRO A-63 16MM x 6 MT ESTRIADO" },
+{ codigo: "MV100407", nombre: "GAS ABASTIBLE KILO" },
+{ codigo: "MV100408", nombre: "GASA ESTERILIZADA" },
+{ codigo: "MV100409", nombre: "GASTOS INSUMOS" },
+{ codigo: "MV100410", nombre: "GLASSEX ANTIGRASA C/ PULVERIZADOR 650ML" },
+{ codigo: "MV100411", nombre: "GUANTE VULKAN OIL NITRILO MY3300 9" },
+{ codigo: "MV100412", nombre: "JARDINERA TERMICA F JORD NEGRO L" },
+{ codigo: "MV100413", nombre: "JARDINERA TERMICA WB ICEBERG XL" },
+{ codigo: "MV100414", nombre: "LIMPIA VIDRIOS RECARGA" },
+{ codigo: "MV100415", nombre: "MACROPOXI 646 RAL 5005 GALON" },
+{ codigo: "MV100416", nombre: "MANLAC ORO 3/U" },
+{ codigo: "MV100417", nombre: "MASCARILLA CRAMBERRY 50/U" },
+{ codigo: "MV100418", nombre: "MASCARILLA MRED 50/U" },
+{ codigo: "MV100419", nombre: "MATERIALES DE  CONSTRUCCION Y MANTENCION" },
+{ codigo: "MV100420", nombre: "MOPA HUMEDA MICRIFIBRA 60 CMS" },
+{ codigo: "MV100421", nombre: "PAR GUANTES PARA ALTAS TEMPERATURAS 450°" },
+{ codigo: "MV100422", nombre: "PL LAMINADA EN CALIENTE 3.0X1000X3000MM" },
+{ codigo: "MV100423", nombre: "PLANCHA ACERO DIAMANTADA 3MM X 1000MM X 3000MM" },
+{ codigo: "MV100424", nombre: "PLANCHA ACERO LAMINADA 3MM X 1000MM X 3000MM" },
+{ codigo: "MV100425", nombre: "PLANCHA ACERO LAMINADA 4MM X 1000MM X 3000MM" },
+{ codigo: "MV100426", nombre: "POLIURETANO PROYECTADO" },
+{ codigo: "MV100427", nombre: "PORTA MOPA + MANGO MICRIF 60 CMS" },
+{ codigo: "MV100428", nombre: "Producto Especial" },
+{ codigo: "MV100429", nombre: "REMOVEDOR DE PINTURA SUPER" },
+{ codigo: "MV100430", nombre: "RETIRO RESIDUOS" },
+{ codigo: "MV100431", nombre: "REVISION" },
+{ codigo: "MV100432", nombre: "RODILLO CHIPORRO" },
+{ codigo: "MV100433", nombre: "SECADOR DE MANOS MODELO DRYJET II COLOR BLANCO" },
+{ codigo: "MV100434", nombre: "SECADOR DE MANOS MODELO SMART COLOR BLANCO" },
+{ codigo: "MV100435", nombre: "SERV PEDIDOS YA" },
+{ codigo: "MV100436", nombre: "SOFT 1,2L" },
+{ codigo: "MV100437", nombre: "TINTE PROTEC P/MADERA ALGIFOL COLOR CASTAÑO GL" },
+{ codigo: "MV100438", nombre: "TOALLITAS DESINFECTANTES LIDER 50/U" },
+{ codigo: "MV100439", nombre: "TRABAJOS DE MANTENIMIENTO" },
+{ codigo: "MV100440", nombre: "TRABAJOS DE REPARACION" },
+{ codigo: "MV100441", nombre: "TRAPERO HUMEDO NOVA 10/U" },
+{ codigo: "MV100442", nombre: "TRAPERO MICROFIBRA AZUL" },
+{ codigo: "MV100443", nombre: "VIRUTILLA FINA MEDIANA" },
+{ codigo: "MV100444", nombre: "CENTRIFUGA MANUAL DE VEGETALES 25L" },
+{ codigo: "MV100445", nombre: "CUMPLEAÑOS CARLOTA" },
+{ codigo: "MV100446", nombre: "RETIRO MENSUAL" },
+{ codigo: "MV100447", nombre: "MANTENCION" },
+{ codigo: "MV100448", nombre: "HORA EXCAVADORA" },
+{ codigo: "MV100449", nombre: "SERVICIO SPECTANK JULIO" },
+{ codigo: "MV100450", nombre: "COMIISION MENSUAL MANTENCION Y USO LINEA DE CREDITO TARJETA VISA EM" },
+{ codigo: "MV100451", nombre: "HONORARIOS" },
+{ codigo: "MEN100452", nombre: "COLADOR 15CM" },
+{ codigo: "MEN100453", nombre: "COLADOR 18CM" },
+{ codigo: "MEN100454", nombre: "HIELERAS 1 LITRO" },
+{ codigo: "MEN100455", nombre: "POTE KRAFT CON TAPA CHICO" },
+{ codigo: "MEN100456", nombre: "POTE KRAFT CON TAPA GRANDE" },
+{ codigo: "MEN100457", nombre: "POTE KRAFT CON TAPA MEDIANO" },
+{ codigo: "MEN100458", nombre: "PRENSA PAPAS ILKO" },
+{ codigo: "MEN100459", nombre: "TAPON DOSIFICADOR" },
+{ codigo: "MEN100460", nombre: "TAZA CAPPUCCINO 180ML CON PLATO LOGO NEGRO" },
+{ codigo: "MEN100461", nombre: "TAZA ESPRESSO 70ML CON PLATO LOGO  NEGRO" },
+{ codigo: "MEN100462", nombre: "TAZA LATTE 200ML XON PLATO LOGO NEGRO" },
+{ codigo: "MEN100463", nombre: "VASO DE CAFÉ HAUSBRAND 9 Oz" },
+{ codigo: "MEN100464", nombre: "VASO VIDRIO SHOT TIMELESS 60CC PASABAHCE" },
+{ codigo: "PSC100465", nombre: "ALBACORA 3U" },
+{ codigo: "PSC100466", nombre: "ATUN 4U" },
+{ codigo: "PSC100467", nombre: "COLA DE CONGRIO" },
+{ codigo: "PSC100468", nombre: "CONGRIO 3U" },
+{ codigo: "PSC100469", nombre: "CONGRIO MEDALLON" },
+{ codigo: "PSC100470", nombre: "MERLUZA 3U" },
+{ codigo: "PSC100471", nombre: "MERLUZA COLA" },
+{ codigo: "PSC100472", nombre: "PEJERREY CONGELADO" },
+{ codigo: "PSC100473", nombre: "REINETA FRESCA 3U" },
+{ codigo: "PSC100474", nombre: "SALMON 3U" },
+{ codigo: "PSC100475", nombre: "TRUCHA RELLENA 3U" },
+{ codigo: "PSC100476", nombre: "MERLUZA PERSONAL" },
+{ codigo: "PES100477", nombre: "TRUCHA 3U" },
+{ codigo: "POR100478", nombre: "ALMEJA CARNE COCIDA" },
+{ codigo: "POR100479", nombre: "ALMEJA CARNE CRUDA" },
+{ codigo: "POR100480", nombre: "ANILLOS DE CALAMAR" },
+{ codigo: "POR100481", nombre: "ARANDANO 1K" },
+{ codigo: "POR100482", nombre: "ARROZ DEL MAR CRUDO" },
+{ codigo: "POR100483", nombre: "ARVEJAS GRANO CONGELADAS 1K" },
+{ codigo: "POR100484", nombre: "BASE ARROZ DEL MAR" },
+{ codigo: "POR100485", nombre: "BIT AND PICE SALMON FRIO" },
+{ codigo: "POR100486", nombre: "CABEZA DE CONGRIO" },
+{ codigo: "POR100487", nombre: "CALDO ALIADO" },
+{ codigo: "POR100488", nombre: "CALDO PULMAY" },
+{ codigo: "POR100489", nombre: "CAMARON 1K" },
+{ codigo: "POR100490", nombre: "CAMARON GAMBA 10U" },
+{ codigo: "POR100491", nombre: "CAMARON GAMBAS 1/2 KILO" },
+{ codigo: "POR100492", nombre: "CAMARON PIL-PIL 20U" },
+{ codigo: "POR100493", nombre: "CARACOL 1K" },
+{ codigo: "POR100494", nombre: "CARNE MECHADA PLATO" },
+{ codigo: "POR100495", nombre: "CEBOLLA CARAMELIZADA" },
+{ codigo: "POR100496", nombre: "CENTOLLA KILO" },
+{ codigo: "POR100497", nombre: "CHOCLO A LA CREMA" },
+{ codigo: "POR100498", nombre: "CHOCLO DULCE LOCAL UN" },
+{ codigo: "POR100499", nombre: "CHOCLO GRANO CJ 1Kx15 PM" },
+{ codigo: "POR100500", nombre: "CHORITOS EN CONCHA" },
+{ codigo: "POR100501", nombre: "CHORITOS SIN CONCHA 1K" },
+{ codigo: "POR100502", nombre: "CHORIZO PARRILLERO" },
+{ codigo: "POR100503", nombre: "CHOROS MALTON" },
+{ codigo: "POR100504", nombre: "CHULETA ADOBADA 4U" },
+{ codigo: "POR100505", nombre: "CHULETA PERSONAL" },
+{ codigo: "POR100506", nombre: "CHUPE CAMARON 500g" },
+{ codigo: "POR100507", nombre: "CHUPE CENTOLLA 500G" },
+{ codigo: "POR100508", nombre: "CHUPE DE JAIBA 500G" },
+{ codigo: "POR100509", nombre: "CHUPE LOCOS 500G" },
+{ codigo: "POR100510", nombre: "COCHAYUYO FRIO 500G" },
+{ codigo: "POR100565", nombre: "POLLO RELLENO 3U" },
+{ codigo: "POR100512", nombre: "CORVINA 3U" },
+{ codigo: "POR100513", nombre: "COSTILLAR AHUM. APROX 800 grs 1/4 PIEZA A/V" },
+{ codigo: "POR100514", nombre: "CREMA DE CHOCLO/JAIBA" },
+{ codigo: "POR100515", nombre: "CREMA DE VERDURAS" },
+{ codigo: "POR100516", nombre: "CREMA DE ZAPALLO" },
+{ codigo: "POR100517", nombre: "CREPPE DE CARNE" },
+{ codigo: "POR100518", nombre: "CREPPE DE CENTOLLA" },
+{ codigo: "POR100519", nombre: "CREPPE DE JAIBA" },
+{ codigo: "POR100520", nombre: "CREPPE DEL MAR" },
+{ codigo: "POR100521", nombre: "CULENGUE GARI  CONGELADO BLOQUE" },
+{ codigo: "POR100522", nombre: "ERIZO EN LENGUA" },
+{ codigo: "POR100523", nombre: "ESPARRAGOS 1K" },
+{ codigo: "POR100524", nombre: "ESPINACAS A LA CREMA" },
+{ codigo: "POR100525", nombre: "FILETE 4U" },
+{ codigo: "POR100526", nombre: "HAMBURGUESA NIÑO" },
+{ codigo: "POR100527", nombre: "HAMBURGUESA PERSONAL" },
+{ codigo: "POR100528", nombre: "HUEPOS 1K" },
+{ codigo: "POR100529", nombre: "JAIBA KILO" },
+{ codigo: "POR100530", nombre: "JAMON" },
+{ codigo: "POR100531", nombre: "JUGO LIMON GUALLARAUCO 1K" },
+{ codigo: "POR100532", nombre: "LANGOSTINOS 10U" },
+{ codigo: "POR100533", nombre: "LAPA" },
+{ codigo: "POR100534", nombre: "LOCO MAYO 4U" },
+{ codigo: "POR100535", nombre: "LOCO PICADA" },
+{ codigo: "POR100536", nombre: "LOCOS 1/U" },
+{ codigo: "POR100537", nombre: "LOCOS AL PILPIL 200G" },
+{ codigo: "POR100538", nombre: "LOMO LISO 4U" },
+{ codigo: "POR100539", nombre: "LOMO VETADO 4U" },
+{ codigo: "POR100540", nombre: "LONGANIZA GRANEL" },
+{ codigo: "POR100541", nombre: "MACHAS PARMESANA" },
+{ codigo: "POR100542", nombre: "MANTECA DE CERDO 500 grs CAJA 10U" },
+{ codigo: "POR100543", nombre: "MARISCOS LOMO" },
+{ codigo: "POR100544", nombre: "MECHADA FETUCCIN" },
+{ codigo: "POR100545", nombre: "NAVAJUELA 1K" },
+{ codigo: "POR100546", nombre: "OSTIONES 1K" },
+{ codigo: "POR100547", nombre: "PAILA MARINA" },
+{ codigo: "POR100548", nombre: "PAILA PIL-PIL" },
+{ codigo: "POR100549", nombre: "PAPAS FRITAS 2,5K" },
+{ codigo: "POR100550", nombre: "PASTELERA CHOCLO ALBAHACA" },
+{ codigo: "POR100551", nombre: "PATAS CENTOLLA 150G" },
+{ codigo: "POR100552", nombre: "PATAS CENTOLLA 240G" },
+{ codigo: "CNG100295", nombre: "PECHUGA DEHUESADA DE POLLO" },
+{ codigo: "POR100554", nombre: "PERLAN DE CAMARON" },
+{ codigo: "POR100555", nombre: "PERLAN caliente" },
+{ codigo: "POR100556", nombre: "PERLAN PLANCHA" },
+{ codigo: "POR100557", nombre: "PINO NAVAJUELA" },
+{ codigo: "POR100558", nombre: "PINO VACUNO" },
+{ codigo: "POR100559", nombre: "PINZA DE JAIBA KILO" },
+{ codigo: "POR100560", nombre: "PINZA DE JAIBA PIL-PIL" },
+{ codigo: "POR100561", nombre: "PINZA JAIBA DECORACION" },
+{ codigo: "POR100562", nombre: "PIURES CONGELADOS" },
+{ codigo: "POR100563", nombre: "PIURES CONGELADOS 1K LIMPIO" },
+{ codigo: "POR100564", nombre: "PLATEADA" },
+{ codigo: "POR100553", nombre: "PECHUGA DE POLLO 6/u" },
+{ codigo: "POR100566", nombre: "POROTO GRANADO BF KILO" },
+{ codigo: "POR100567", nombre: "POROTOS VERDES" },
+{ codigo: "POR100568", nombre: "PULPO COCIDO KL" },
+{ codigo: "POR100569", nombre: "SALMON SLICE NATURAL" },
+{ codigo: "POR100570", nombre: "SALSA CARDENAL 150G" },
+{ codigo: "POR100571", nombre: "SALSA CENTOLLA EMPERATRIZ" },
+{ codigo: "POR100572", nombre: "SALSA DE CHAMPIÑON" },
+{ codigo: "POR100573", nombre: "SALSA DE PICOROCO" },
+{ codigo: "POR100574", nombre: "SALSA DE PIMIENTA" },
+{ codigo: "POR100575", nombre: "SALSA FETUCCIN CARNE VACUNO (Boloñesa)" },
+{ codigo: "POR100576", nombre: "SALSA JAIBA (IMPERIAL)" },
+{ codigo: "POR100577", nombre: "SALSA MARGARITA" },
+{ codigo: "POR100578", nombre: "SALSA NOGADA" },
+{ codigo: "POR100579", nombre: "SALSA PAPILLOT" },
+{ codigo: "POR100580", nombre: "SOFRITO DE ARVEJAS/ARROZ" },
+{ codigo: "POR100581", nombre: "SOPA NIÑO MENU" },
+{ codigo: "POR100582", nombre: "SURTIDO ARRIERO" },
+{ codigo: "POR100583", nombre: "TIMBAL DE JAIBA (CARNE)" },
+{ codigo: "POR100584", nombre: "TOCINO AHUMADO LAM. 150 grs A/V CAJA 12U" },
+{ codigo: "POR100585", nombre: "TRUCHA 10U" },
+{ codigo: "POR100511", nombre: "COCHAYUYO pollo relleno" },
+{ codigo: "POR100587", nombre: "ULTE KILO" },
+{ codigo: "POR100588", nombre: "ULTE KILO" },
+{ codigo: "POR100589", nombre: "VIENESA 20U" },
+{ codigo: "VL100590", nombre: "STANGE BOCK" },
+{ codigo: "VL100591", nombre: "ALTO DEL CARMEN ESPEC 35° x 06 VID 750cc" },
+{ codigo: "VL100592", nombre: "AMARETO DISARONNO ORIGINALE 28° BT" },
+{ codigo: "VL100593", nombre: "AMARGO ANGOSTURA 100cc 44,7° BT" },
+{ codigo: "VL100594", nombre: "APEROL 6x750cc LICOR 11° BT" },
+{ codigo: "VL100595", nombre: "ARAUCANO 28° BT" },
+{ codigo: "VL100596", nombre: "AUSTRAL CALAFATE 4PKx6 VNR 331" },
+{ codigo: "VL100597", nombre: "AUSTRAL LAGER 4PKx6 VNR 330" },
+{ codigo: "VL100598", nombre: "AUSTRAL PAT508 4PKx6 VNR 330" },
+{ codigo: "VL100599", nombre: "BAILEYS 750CC" },
+{ codigo: "VL100600", nombre: "BALLANTINES FINEST 750CC" },
+{ codigo: "VL100601", nombre: "BARON LACROIX BRUT 750CC" },
+{ codigo: "VL100602", nombre: "BARSOL QUEBRANTA 40° VNR 4000x4" },
+{ codigo: "VL100603", nombre: "BEEFEATER 750 GIN" },
+{ codigo: "VL100604", nombre: "BOLS HO AMARETO LICOR 24° BOTELLA" },
+{ codigo: "VL100605", nombre: "BOLS HO BLUE" },
+{ codigo: "VL100606", nombre: "BOLS HO CASSIS 6x700cc LICOR 24° BT" },
+{ codigo: "VL100607", nombre: "BOLS HO MENTA 6x700cc LICOR 24° BT" },
+{ codigo: "VL100608", nombre: "CACHACA 51  12x965cc LICOR DE CAÑA 40° BT" },
+{ codigo: "VL100609", nombre: "CALITERRA RVA CHARDONNAY 12x750cc VINO 12° BT" },
+{ codigo: "VL100610", nombre: "CAMPARI 750CC" },
+{ codigo: "VL100611", nombre: "CAROLANS IRISH CREAM 750" },
+{ codigo: "VL100612", nombre: "CASTILLO DE MOLINA G/R S/B 750CC" },
+{ codigo: "VL100613", nombre: "CASTILLO DE MOLINA GRAN RESERVA C/S 750" },
+{ codigo: "VL100614", nombre: "CASTILLO DE MOLINA GRAN RESERVA CAR" },
+{ codigo: "VL100615", nombre: "CASTILLO DE MOLINA GRAN RESERVA CHAR" },
+{ codigo: "VL100616", nombre: "CASTILLO DE MOLINA PINOT NOIR 750CC" },
+{ codigo: "VL100617", nombre: "CHAMAN GRAN RIVA CARMENERE 6x750cc VINO 14° BT" },
+{ codigo: "VL100618", nombre: "CHAMBORD 12x750cc LICOR  16,5° BT" },
+{ codigo: "VL100619", nombre: "CHATEAU LOS BOLDOS CHARD 750cc" },
+{ codigo: "VL100620", nombre: "CHIVAS REGAL 12 A  OS 40 GL VNR 750cc" },
+{ codigo: "VL100621", nombre: "CHIVAS REGAL 18 A  OS 40 GL VNR 750cc" },
+{ codigo: "VL100622", nombre: "CRISTAL ZERO 355CC" },
+{ codigo: "VL100623", nombre: "DOLBEK MAQUI 4PCx6 VNR 330cc" },
+{ codigo: "VL100624", nombre: "DRAMBUI" },
+{ codigo: "VL100625", nombre: "ERRAZURIZ ACONCAGUA CUVEE C/S 6x750cc VINO 12° BT" },
+{ codigo: "VL100626", nombre: "ERRAZURIZ ACONCAGUA CUVEE SAUV. BLANC 6x750cc VINO 12° BT" },
+{ codigo: "VL100627", nombre: "ERRAZURIZ CUVEE ENSAMBLAJE BT 750 cc" },
+{ codigo: "VL100628", nombre: "ERRAZURIZ ESTATE CABERNET 12x750cc VINO 14° BT" },
+{ codigo: "VL100629", nombre: "ERRAZURIZ ESTATE CARMEN 12x750cc VINO 14° BT" },
+{ codigo: "VL100630", nombre: "ERRAZURIZ MAX CABERNET 6x750cc VINO 12° BT" },
+{ codigo: "VL100631", nombre: "ERRAZURIZ MAX CHARDONN6x750cc VINO 12° BT" },
+{ codigo: "VL100632", nombre: "ERRAZURIZ MAX SAUVIGN 6x750cc VINO 12° BT" },
+{ codigo: "VL100633", nombre: "FEDERICO DE ALVEAR EXT BRUT 750CC" },
+{ codigo: "VL100634", nombre: "FELIPE II 40°" },
+{ codigo: "VL100635", nombre: "FRANGELICO 12x700cc LICOR 20° BT" },
+{ codigo: "VL100636", nombre: "GINGER BEER FENTIMANS" },
+{ codigo: "VL100637", nombre: "GLENFIDDICH 12 750CC" },
+{ codigo: "VL100638", nombre: "GRANADINA MITJANS 0° BT" },
+{ codigo: "VL100639", nombre: "HAVANA CLUB 7 700CC" },
+{ codigo: "VL100640", nombre: "HAVANA CLUB ESPECIAL 700CC" },
+{ codigo: "VL100641", nombre: "HEINEKEN CANAST.  6PCANx4 VNR 330cc" },
+{ codigo: "VL100642", nombre: "HEINEKEN CERO 6PCANx4 VNR 330cc" },
+{ codigo: "VL100643", nombre: "HENDRICKS 6x700cc GIN 41,4° BOTELLA" },
+{ codigo: "VL100644", nombre: "JACK DANIELS  FIRE S/EST 12X750cc WHISKEY 40° BT" },
+{ codigo: "VL100645", nombre: "JACK DANIELS HONEY S/EST 12x1000cc WHISKEY 40° BT" },
+{ codigo: "VL100646", nombre: "JACK DANIELS OLD N7 S/EST 12x750cc WHISKEY 40° BT" },
+{ codigo: "VL100647", nombre: "JAGER MEISTER 6x1000cc LICOR 35° BOTELLA" },
+{ codigo: "VL100648", nombre: "JEREZ TIO PEPE BT" },
+{ codigo: "VL100649", nombre: "JOHNNIE WALKER BLACK 40°" },
+{ codigo: "VL100650", nombre: "JOHNNIE WALKER DOUBLE BLACK 40°" },
+{ codigo: "VL100651", nombre: "JOHNNIE WALKER RED 40°" },
+{ codigo: "VL100652", nombre: "KAHLUA 750CC" },
+{ codigo: "VL100653", nombre: "KUNST MIEL 6PX4 VNR330 TC" },
+{ codigo: "VL100654", nombre: "KUNSTM BOCK 4Px6 VNR 330 cc" },
+{ codigo: "VL100655", nombre: "KUNSTM LAGER 4PCx6 VNR 330 cc" },
+{ codigo: "VL100656", nombre: "KUNSTM LAGER SIN FILTRAR 4PKx6 VNR 330cc" },
+{ codigo: "VL100657", nombre: "KUNSTM SIN ALCOHOL 4Px6 VNR 330 cc" },
+{ codigo: "VL100658", nombre: "KUNSTM TOROB 4PCx6 VNR 330 cc" },
+{ codigo: "VL100659", nombre: "LEYDA RE CH VNR 750cc x 12 TR" },
+{ codigo: "VL100660", nombre: "LEYDA COASTAL VINEYARD CHARD 750cc" },
+{ codigo: "VL100661", nombre: "LEYDA COASTAL VINEYARD S/B 750cc" },
+{ codigo: "VL100662", nombre: "LEYDA RE CA VNR 750cc x12  CO" },
+{ codigo: "VL100663", nombre: "LEYDA RE S/B VNR 750cc x12  CO" },
+{ codigo: "VL100664", nombre: "LICOR AMARETO FEHRENBERG 750cc" },
+{ codigo: "VL100665", nombre: "LICOR AMARETO MITJANS 750cc" },
+{ codigo: "VL100666", nombre: "LICOR CASSIS MITJANS 750" },
+{ codigo: "VL100667", nombre: "LICOR DE CACAO MITJANS 25° BT" },
+{ codigo: "VL100668", nombre: "LICOR DE CAFÉ BOLS 700CC" },
+{ codigo: "VL100669", nombre: "LICOR DE CAFE MITJANS" },
+{ codigo: "VL100670", nombre: "LICOR FERNET NERO NUMERO 53 750cc" },
+{ codigo: "VL100671", nombre: "LICOR JEREZ CENTENARIO ZALAMERO 750cc" },
+{ codigo: "VL100672", nombre: "LICOR MANZANILLA FEHRENBERG" },
+{ codigo: "VL100673", nombre: "LICOR MENTA FEHRENBERG" },
+{ codigo: "VL100674", nombre: "LICOR TRES PALOS 1000cc 38° BT" },
+{ codigo: "VL100675", nombre: "MARTINI BIANCO BT" },
+{ codigo: "VL100676", nombre: "MARTINI EXTRA DRY BT" },
+{ codigo: "VL100677", nombre: "MIGUEL TORRES STELADO ROSE BRUT" },
+{ codigo: "VL100678", nombre: "MISIONES CUVEE CAR" },
+{ codigo: "VL100679", nombre: "MISIONES DE RENGO CHAR" },
+{ codigo: "VL100680", nombre: "MISIONES DE RENGO S/B" },
+{ codigo: "VL100681", nombre: "MISTRAL 35° VNR 750cc x 6" },
+{ codigo: "VL100682", nombre: "MISTRAL 40° VNR 750cc x 6" },
+{ codigo: "VL100683", nombre: "MISTRAL NOBEL" },
+{ codigo: "VL100684", nombre: "MONKEY SHOULDER 700" },
+{ codigo: "VL100685", nombre: "OPORTO DIAMANTE 750CC" },
+{ codigo: "VL100686", nombre: "PISCO CULTURA PISCO ESPECIAL  38° 2000cc 38° BT" },
+{ codigo: "VL100687", nombre: "PISCO WAQAR 40° BT" },
+{ codigo: "VL100688", nombre: "RAMAZZOTTI 750" },
+{ codigo: "VL100689", nombre: "RICADONNA CHARDONAY BRUT" },
+{ codigo: "VL100690", nombre: "RICCADONA PROSECCO BOTELLIN" },
+{ codigo: "VL100691", nombre: "RON MALIBU CON COCO 21° BT" },
+{ codigo: "VL100692", nombre: "RON SIERRA MORENA BLANCO 750" },
+{ codigo: "VL100693", nombre: "RON ZACAPA BT" },
+{ codigo: "VL100694", nombre: "ROSSARD BITTER CLASSICO 700" },
+{ codigo: "VL100695", nombre: "SOL CANAST.  6PCANx4 VNR 330cc SO" },
+{ codigo: "VL100696", nombre: "ST.GERMAIN 750CC" },
+{ codigo: "VL100697", nombre: "STANGE LAGER" },
+{ codigo: "VL100698", nombre: "STANGE MAIBOCK" },
+{ codigo: "VL100699", nombre: "STOLICHINAYA 12x1000cc VODKA 40° BT" },
+{ codigo: "VL100700", nombre: "TABALI PEDREGOSO S/B" },
+{ codigo: "VL100701", nombre: "TABERNERO 2L" },
+{ codigo: "VL100702", nombre: "TANQUERAY GIN 750 BT" },
+{ codigo: "VL100703", nombre: "TARAPACA ET NEGRA C/S" },
+{ codigo: "VL100704", nombre: "TARAPACA G/R S/B 750CC" },
+{ codigo: "VL100705", nombre: "TARAPACA GRAN RESERVA C/S" },
+{ codigo: "VL100706", nombre: "TARAPACA GRAN RESERVA CAR" },
+{ codigo: "VL100707", nombre: "TARAPACA GRAN RESERVA CHAR" },
+{ codigo: "VL100708", nombre: "TEQUILA EL JIMADOR 750 BT" },
+{ codigo: "VL100709", nombre: "TESIS PRIMIUM CHARD 750CC" },
+{ codigo: "VL100710", nombre: "TRIPLE SEC BOLS" },
+{ codigo: "VL100711", nombre: "UNDURRAGA ALIWEN CABERNET 6x750cc VINO13° BT" },
+{ codigo: "VL100712", nombre: "UNDURRAGA ALIWEN ORGANICO CABERNET  6x750cc VINO13° BT" },
+{ codigo: "VL100713", nombre: "UNDURRAGA ALIWEN RESERVA CHAR 750CC" },
+{ codigo: "VL100714", nombre: "UNDURRAGA BRUT 12x750cc 12° ESPUMANTE BOT" },
+{ codigo: "VL100715", nombre: "UNDURRAGA BRUT ROYAL 6x750cc ESPUMANTE 13° BT" },
+{ codigo: "VL100716", nombre: "UNDURRAGA LATE HARVEST" },
+{ codigo: "VL100717", nombre: "UNDURRAGA ROSSE ROYAL" },
+{ codigo: "VL100718", nombre: "UNDURRAGA SIBARIS CARMENERE 6x750cc VINO 13° BT" },
+{ codigo: "VL100719", nombre: "UNDURRAGA TH S/B 750CC" },
+{ codigo: "VL100720", nombre: "UNDURRGA ALIWEN S/B BT 750 cc" },
+{ codigo: "VL100721", nombre: "UNDURRGA LONG PLAY BRUT BT 750 cc" },
+{ codigo: "VL100722", nombre: "VERMUTH IRIS ROJO" },
+{ codigo: "VL100723", nombre: "VINO BLANCO 2L" },
+{ codigo: "VL100724", nombre: "VINO TINTO 2L" },
+{ codigo: "VL100725", nombre: "VIÑA MAR BRUT" },
+{ codigo: "VL100726", nombre: "VIÑA MAR ZERO" },
+{ codigo: "VL100727", nombre: "VIU MANENT TINY TRAINS CHARD 750CC" },
+{ codigo: "VL100728", nombre: "VODKA ABSULUT 700cc" },
+{ codigo: "VL100729", nombre: "DOLBEK LAGER 330" },
+{ codigo: "VL100730", nombre: "FERNET BRANCA" },
+{ codigo: "VL100731", nombre: "MIEL ULMO" },
+{ codigo: "VL100732", nombre: "RED BULL TRADICIONAL" },
+{ codigo: "VL100733", nombre: "MISIONES DE RENGO CAR" },
+{ codigo: "FV100734", nombre: "LIMON DE PICA" },
+{ codigo: "ABA100735", nombre: "COLAPEZ" },
+{ codigo: "ABA100736", nombre: "LUSTRA MUEBLES SPRAY" },
+{ codigo: "ABA100737", nombre: "BANDEJA RECTANGULAR CARTON" },
+{ codigo: "ABA100738", nombre: "TE BLACKCURRANT BURST" },
+{ codigo: "VL100739", nombre: "TORO DE PIEDRA CARMENERE" },
+{ codigo: "CON100740", nombre: "POSTA ROSADA" },
+{ codigo: "ABA100741", nombre: "ARROZ PREGRANEADO 1K" },
+{ codigo: "ABA100742", nombre: "CHANCACA" },
+{ codigo: "ABA100743", nombre: "CLORO GEL" },
+{ codigo: "CNG100744", nombre: "PULPA CERDO" },
+{ codigo: "CNG100745", nombre: "AJI PASTA 1K" },
+{ codigo: "CNG100746", nombre: "HUESILLO" },
+{ codigo: "CNG100747", nombre: "MOTE" },
+{ codigo: "CNG100748", nombre: "Repollo VER/Mor" },
+{ codigo: "CNG100749", nombre: "Brocoli" },
+{ codigo: "CNG100750", nombre: "POLLO GANSO" },
+{ codigo: "CNG100751", nombre: "Frutillas Frescas" },
+{ codigo: "CNG100752", nombre: "Mandarina kilo" },
+{ codigo: "CNG100753", nombre: "TOMATE CHERRY KILO" },
+{ codigo: "CNG100754", nombre: "MELON TUNA UNIDAD" },
+{ codigo: "CNG100755", nombre: "PLATANO KILO" },
+{ codigo: "CNG100756", nombre: "COCHAYUYO PQTE" },
+{ codigo: "CNG100757", nombre: "CONCENTRADO DE TOMATE 3K" },
+{ codigo: "CNG100758", nombre: "ABRILLANTADOR LAVAVAJILLAS 20 LTS" },
+{ codigo: "CNG100759", nombre: "UNDURRAGA SIBARIS CHARDONNAY 6x750cc VINO 13° BT" },
+{ codigo: "CNG100760", nombre: "GLENFIDDICH 15 750CC" },
+{ codigo: "CNG100761", nombre: "MENTA MITJANS" },
+{ codigo: "CNG100762", nombre: "ERRAZURIZ STATE SOUVIGNON BLANC" },
+{ codigo: "CNG100763", nombre: "Rollo prepicado 30x40" },
+{ codigo: "CNG100764", nombre: "CLAVO DE OLOR" },
+{ codigo: "CNG100765", nombre: "Cubierto Delivery" },
+{ codigo: "CNG100766", nombre: "Romero" },
+{ codigo: "CNG100767", nombre: "G97 s/p" },
+{ codigo: "CNG100768", nombre: "Pomelo" },
+{ codigo: "CNG100769", nombre: "CHORIZO PARRILLERO Brauna" },
+{ codigo: "CNG100770", nombre: "BOLSA vacio 18x25x90" },
+{ codigo: "CNG100771", nombre: "Pernil Ahumado sin Hueso" },
+{ codigo: "CNG100772", nombre: "Rollo Termico 80x80" },
+{ codigo: "CNG100773", nombre: "separador Oficio" },
+{ codigo: "CNG100774", nombre: "CONGRIO COLORADO" },
+{ codigo: "CNG100775", nombre: "Reineta Kilo" },
+{ codigo: "ABA200006", nombre: "KATANKURA ACEITE TRUFA NEGRA 280 ML" },
+{ codigo: "ABA200007", nombre: "GUANTE VINILO (M)" },
+{ codigo: "ABA200008", nombre: "GUANTE VINILO (L)" },
+
+    ];
+
+    // Variable para almacenar la selección actual del usuario
+    let productoSeleccionado = null;
+
+    // Función para mostrar sugerencias de productos
+    function mostrarSugerencias() {
+      const input = document.getElementById("search").value.toLowerCase();
+      const sugerenciasDiv = document.getElementById("sugerencias");
+
+      if (!input) {
+        sugerenciasDiv.style.display = "none";
+        return;
+      }
+
+      const resultados = productosLista
+        .filter(
+          (p) =>
+            p.codigo.toLowerCase().includes(input) ||
+            p.nombre.toLowerCase().includes(input)
+        )
+        .slice(0, 10);
+
+      // Generar HTML de sugerencias
+      sugerenciasDiv.innerHTML = resultados
+        .map(
+          (p) => `
+            <div class="autocomplete-suggestion" onclick="seleccionarProducto('${p.codigo}')">
+              ${p.codigo} - ${p.nombre}
+            </div>`
+        )
+        .join("");
+
+      sugerenciasDiv.style.display = "block";
+    }
+
+    // Seleccionar un producto de la lista de sugerencias
+    function seleccionarProducto(codigo) {
+      productoSeleccionado = productosLista.find((p) => p.codigo === codigo);
+      document.getElementById("search").value = `${productoSeleccionado.codigo} - ${productoSeleccionado.nombre}`;
+      document.getElementById("sugerencias").style.display = "none";
+    }
+
+    // Agregar producto a la tabla
+    function agregarProducto() {
+      if (!productoSeleccionado) {
+        alert("Seleccione un producto válido.");
+        return;
+      }
+      const cantidad = parseInt(document.getElementById("cantidad").value);
+      const tabla = document.getElementById("pedido");
+
+      // Crear fila de la tabla
+      let fila = document.createElement("tr");
+      fila.innerHTML = `
+        <td>${productoSeleccionado.codigo}</td>
+        <td>${productoSeleccionado.nombre}</td>
+        <td><input type="number" value="${cantidad}" min="1" /></td>
+        <td><button onclick="eliminarProducto(this)">Eliminar</button></td>
+      `;
+
+      tabla.appendChild(fila);
+      // Limpiar búsqueda
+      document.getElementById("search").value = "";
+      productoSeleccionado = null;
+    }
+
+    // Eliminar una fila de la tabla
+    function eliminarProducto(boton) {
+      boton.parentNode.parentNode.remove();
+    }
+
+    // Exportar el pedido a Excel y abrir WhatsApp con el mensaje
+    function exportarYEnviarWhatsApp() {
+      let fecha = document.getElementById("fecha").value;
+      let encargado = document.getElementById("encargado").value || "Sin asignar";
+      let area = document.getElementById("area").value.replace(/\s+/g, '-');
+      let numeroWhatsApp = document.getElementById("whatsapp").value.trim();
+      let tabla = document.getElementById("pedido");
+      let filas = tabla.getElementsByTagName("tr");
+
+      if (filas.length === 0) {
+        alert("No hay productos en el pedido.");
+        return;
+      }
+
+      // Preparar datos para Excel
+      let datos = [
+        ["Fecha", fecha],
+        ["Encargado", encargado],
+        ["Área", area.replace(/-/g, ' ')],
+        [],
+        ["Código", "Nombre", "Cantidad"]
+      ];
+
+      // Mensaje de WhatsApp con detalle
+      let mensajeWhatsApp = `📦 *Pedido del área ${area.replace(/-/g, ' ')}*\n` +
+                            `📅 Fecha: *${fecha}*\n` +
+                            `👨‍🍳 Encargado: *${encargado}*\n\n` +
+                            `📋 *Detalle del Pedido:*\n`;
+
+      // Recorrer filas de la tabla
+      for (let fila of filas) {
+        let celdas = fila.getElementsByTagName("td");
+        let codigo = celdas[0].textContent;
+        let nombre = celdas[1].textContent;
+        let cantidad = celdas[2].getElementsByTagName("input")[0].value;
+
+        datos.push([codigo, nombre, cantidad]);
+        mensajeWhatsApp += `🔹 ${cantidad} x ${nombre} (${codigo})\n`;
+      }
+
+      // Crear libro y hoja de Excel
+      let wb = XLSX.utils.book_new();
+      let ws = XLSX.utils.aoa_to_sheet(datos);
+      XLSX.utils.book_append_sheet(wb, ws, "Pedido");
+
+      // Nombre de archivo
+      let nombreArchivo = `Pedido_${fecha}_${area}.xlsx`;
+      XLSX.writeFile(wb, nombreArchivo);
+
+      // Abrir WhatsApp
+      if (numeroWhatsApp) {
+        let url = `https://wa.me/${numeroWhatsApp}?text=${encodeURIComponent(mensajeWhatsApp)}`;
+        window.open(url, "_blank");
+      }
+    }
+  </script>
+</body>
+</html>
